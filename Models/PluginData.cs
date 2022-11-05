@@ -38,10 +38,12 @@ namespace ModManager.Models
             get { return Plugins.IndexOf(this); }
             set
             {
+                if (value < 0 || value >= Plugins.Count ) { return; } // Stop out of range exception.
+
                 // Use UI thread to avoid Null Reference Exception when Avalonia get confused by changes to the collection
                 // and to ensure everything gets updated with the changed values.
                 Dispatcher.UIThread.Post(() => Plugins.RemoveAt(Priority)); 
-                Dispatcher.UIThread.Post(() => Plugins.Insert(value, this));
+                Dispatcher.UIThread.Post(() => Plugins.Insert(value, this)); 
                 Dispatcher.UIThread.Post(() => SavePlugins?.Invoke());
 
                 // Tell Avalonia that Priority has been updated, need to run on entire collection as the priority is linked to index
