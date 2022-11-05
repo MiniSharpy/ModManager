@@ -4,17 +4,24 @@ using ReactiveUI;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reactive;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace ModManager.ViewModels
 {
     public class MainWindowViewModel : ReactiveObject
     {
-        static readonly string GameDataPath = "C:\\Games\\GOG Galaxy\\Games\\Skyrim Anniversary Edition\\Data"; // TODO: Set via user input on initial load.
-        static readonly string PluginFilePath = "C:\\Users\\Bradley\\AppData\\Local\\Skyrim Special Edition GOG\\plugins.txt"; // TODO: Set to the users path..
+        static readonly string GamePath = "D:\\Tools\\Skyrim Anniversary Edition"; // TODO: Set via user input on initial load.
+        static readonly string GameDataPath = GamePath + "\\Data"; // TODO: Set via user input on initial load.
+        static readonly string PluginFilePath = "C:\\Users\\Bradley\\AppData\\Local\\Skyrim Special Edition GOG\\plugins.txt"; // TODO: Set to the users path.
+
+        static readonly string ModManagerPath = Directory.GetCurrentDirectory();
+        static readonly string ModManagerGamePath = ModManagerPath + "\\game\\";
+
 
         /// <summary>
         /// A list of all plugins where index is plugin priority. 
@@ -92,5 +99,49 @@ namespace ModManager.ViewModels
                 .Concat(Directory.EnumerateFiles(GameDataPath, "*.esl", SearchOption.TopDirectoryOnly))
                 .Select(path => Path.GetFileName(path)) // Get only the file name and extension.
                 .OrderBy(file => file); // Order alphabetically
+
+        public static void RunGame()
+        {
+            string? gamePathPartition = Path.GetPathRoot(GameDataPath);
+            string? managerPathPartition = Path.GetPathRoot(Directory.GetCurrentDirectory());
+            if (gamePathPartition != managerPathPartition) { return; } // Hardlinking is only supported on the same partition. TODO: Give an error. We kinda need this feature.
+
+            CreateHardLinks(GamePath);
+            string path = ModManagerGamePath + "Skyrim.ccc"; // Skyrim.ccc overided plugins.txt. TODO: Move into a collection file to delete?
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+
+            ProcessStartInfo info = new(ModManagerGamePath + "SkyrimSE.exe");
+            info.WorkingDirectory = ModManagerGamePath;
+            Process.Start(info);
+        }
+
+        private static void CreateHardLinks(string directory)
+        {
+            var directoryInfo = new DirectoryInfo(directory);
+            foreach (var file in directoryInfo.EnumerateFiles())
+            {
+                var oldFileRelative = Path.GetRelativePath(GamePath, file.FullName);
+                var newDirectory = ModManagerGamePath + Path.GetDirectoryName(oldFileRelative);
+                var newFile = ModManagerGamePath + oldFileRelative;
+
+                Directory.CreateDirectory(newDirectory); // win api will not create hardlink if directory doesn't exist
+
+                Kernel32.CreateHardLink(newFile, file.FullName, IntPtr.Zero);
+            }
+
+            foreach (var dir in directoryInfo.EnumerateDirectories())
+            { 
+                CreateHardLinks(dir.FullName);
+            }
+        }
     }
+}
+
+internal static class Kernel32
+{
+    [DllImport("Kernel32")]
+    public static extern bool CreateHardLink(string fileName, string existingFileName, IntPtr securityAttributes);
 }

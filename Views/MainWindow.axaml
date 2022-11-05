@@ -13,14 +13,20 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-  <Grid>
-    <DataGrid Items="{Binding Plugins}" AutoGenerateColumns="False" >
-      <DataGrid.Columns>
-        <DataGridCheckBoxColumn Binding="{Binding IsActive}" />
-        <DataGridTextColumn Header="Name" Binding="{Binding Name}" IsReadOnly="True"/>
-        <DataGridTextColumn Header="Priority" Binding="{Binding Priority, Mode=TwoWay}" />
-      </DataGrid.Columns>
-    </DataGrid>
-  </Grid>
- 
+
+  <StackPanel>
+    <StackPanel Orientation="Horizontal">
+    <Button Command="{Binding RunGame}">Play</Button>
+
+    </StackPanel>
+    <Grid>
+      <DataGrid Items="{Binding Plugins}" AutoGenerateColumns="False" >
+        <DataGrid.Columns>
+          <DataGridCheckBoxColumn Binding="{Binding IsActive}" />
+          <DataGridTextColumn Header="Name" Binding="{Binding Name}" IsReadOnly="True"/>
+          <DataGridTextColumn Header="Priority" Binding="{Binding Priority, Mode=TwoWay}" />
+        </DataGrid.Columns>
+      </DataGrid>
+    </Grid>
+  </StackPanel>
 </Window>
