@@ -9,13 +9,14 @@ Seperate profiles for different mod lists via managing:
 
 ### Mod Order Sorting:
 - Drag and Drop
-- Conflict information via symbols and contextual highlighting.
+- Conflict information via symbols and contextual highlighting
 - Note Taking
 - Versioning
 
 ### Plugin Order Sorting:
 - Drag and Drop
-- Dependency information via symbols and contextual highlighting.
+- Dependency information via symbols and contextual highlighting
 
 ## Wishful Features:
 - Cross-Platform Support (Linux and Windows)
+- Support multiple games
