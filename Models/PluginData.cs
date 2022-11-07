@@ -16,15 +16,15 @@ namespace ModManager.Models
         public event PropertyChangedEventHandler? PropertyChanged;
 
         private bool _IsActive;
-
-        private Action SavePlugins;
-
         public string Name { get; set; }
 
+        /// <remarks>
+        /// Setter automatically calls <see cref="FileIO.SavePlugins"/> with <see cref="Plugins"/> as the parameter. This is because AvaloniaUI can be limited (articuraly with datagrids) and not allow multiple bindings on change. TODO: Look into DataGridTemplates, might be a way around this.
+        /// </remarks>
         public bool IsActive
         {
             get { return _IsActive; }
-            set { _IsActive = value; SavePlugins?.Invoke(); }
+            set { _IsActive = value; FileIO.SavePlugins(Plugins); }
         }
 
         /// <summary>
@@ -44,7 +44,7 @@ namespace ModManager.Models
                 // and to ensure everything gets updated with the changed values.
                 Dispatcher.UIThread.Post(() => Plugins.RemoveAt(Priority)); 
                 Dispatcher.UIThread.Post(() => Plugins.Insert(value, this)); 
-                Dispatcher.UIThread.Post(() => SavePlugins?.Invoke());
+                Dispatcher.UIThread.Post(() => FileIO.SavePlugins(Plugins));
 
                 // Tell Avalonia that Priority has been updated, need to run on entire collection as the priority is linked to index
                 foreach (var plugin in Plugins)
@@ -62,12 +62,12 @@ namespace ModManager.Models
         /// </remarks>
         private ObservableCollection<PluginData> Plugins { get; }
 
-        public PluginData(string name, bool isActive, Action savePlugins, ObservableCollection<PluginData> plugins)
+        public PluginData(string name, bool isActive, ObservableCollection<PluginData> plugins)
         {
             Name = name;
-            IsActive = isActive;
-            SavePlugins = savePlugins;
+            _IsActive = isActive; // Directly set backing field to avoid calling FileIO.SavePlugins(Plugins) in the property. This is to stop it running potentially hundreds of times during initial setup as it can be called manually anyway.
             Plugins = plugins;
+
         }
 
         private void NotifyPropertyChanged([CallerMemberName] string propertyName = "") => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:ModManager.ViewModels"
+        xmlns:io="using:ModManager"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
@@ -16,11 +17,13 @@
 
   <StackPanel>
     <StackPanel Orientation="Horizontal">
-    <Button Command="{Binding RunGame}">Play</Button>
-
+      <Button Command="{Binding RunGame}">Play</Button>
     </StackPanel>
-    <Grid>
-      <DataGrid Items="{Binding Plugins}" AutoGenerateColumns="False" >
+    
+    <Grid ColumnDefinitions="*, 4, *">
+      <Rectangle Grid.Column="0" Fill="Gray"/>
+      <GridSplitter Grid.Column="1" Background="Black" ResizeDirection="Columns"/>
+      <DataGrid Grid.Column="2" Items="{Binding Plugins}" AutoGenerateColumns="False" >
         <DataGrid.Columns>
           <DataGridCheckBoxColumn Binding="{Binding IsActive}" />
           <DataGridTextColumn Header="Name" Binding="{Binding Name}" IsReadOnly="True"/>
