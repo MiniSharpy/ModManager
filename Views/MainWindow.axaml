@@ -18,12 +18,20 @@
   <StackPanel>
     <StackPanel Orientation="Horizontal">
       <Button Command="{Binding RunGame}">Play</Button>
+      <TextBox Text="{Binding TestPath}"/>
+      <Button Command="{Binding InstallMod}">Install Mod</Button>
+
     </StackPanel>
-    
     <Grid ColumnDefinitions="*, 4, *">
-      <Rectangle Grid.Column="0" Fill="Gray"/>
+      <DataGrid Grid.Column="0" Items="{Binding Mods}" AutoGenerateColumns="False">    <!-- Mod Order -->
+        <DataGrid.Columns>
+          <DataGridCheckBoxColumn Binding="{Binding IsActive}" />
+          <DataGridTextColumn Header="Name" Binding="{Binding Name}" IsReadOnly="True"/>
+          <DataGridTextColumn Header="Priority" Binding="{Binding Priority, Mode=TwoWay}" />
+        </DataGrid.Columns>
+      </DataGrid>
       <GridSplitter Grid.Column="1" Background="Black" ResizeDirection="Columns"/>
-      <DataGrid Grid.Column="2" Items="{Binding Plugins}" AutoGenerateColumns="False" >
+      <DataGrid Grid.Column="2" Items="{Binding Plugins}" AutoGenerateColumns="False">      <!-- Plugin Order -->
         <DataGrid.Columns>
           <DataGridCheckBoxColumn Binding="{Binding IsActive}" />
           <DataGridTextColumn Header="Name" Binding="{Binding Name}" IsReadOnly="True"/>

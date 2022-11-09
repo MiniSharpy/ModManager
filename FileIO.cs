@@ -1,4 +1,5 @@
-﻿using ModManager.Models;
+﻿using DynamicData;
+using ModManager.Models;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -10,50 +11,62 @@ namespace ModManager
 {
     public static class FileIO
     {
-        public static readonly string GamePath = "D:\\Tools\\Skyrim Anniversary Edition"; // TODO: Set via user input on initial load.
-        public static readonly string GameDataPath = GamePath + "\\Data"; // TODO: Set via user input on initial load.
-        public static readonly string PluginFilePath = "C:\\Users\\Bradley\\AppData\\Local\\Skyrim Special Edition GOG\\plugins.txt"; // TODO: Set to the users path.
+        public static readonly string GameSourceDirectory = "D:/Tools/Skyrim Anniversary Edition";  // TODO: Set via user input on initial load.
+        public static readonly string GameDataSourceDirectory = Path.Combine(GameSourceDirectory, "Data");
+        public static readonly string PluginOrderFile = "C:/Users/Bradley/AppData/Local/Skyrim Special Edition GOG/plugins.txt"; // TODO: Set to the users path.
 
-        public static readonly string ModManagerPath = Directory.GetCurrentDirectory();
-        public static readonly string ModManagerGamePath = ModManagerPath + "\\game\\";
+        public static readonly string ModManagerDirectory = Directory.GetCurrentDirectory();
+        public static readonly string ModsDirectory = Path.Combine(ModManagerDirectory, "Mods");
+
+        public static readonly string GameTargetDirectory = Path.Combine(ModManagerDirectory, "Game");
+        public static readonly string GameDataTargetDirectory = Path.Combine(GameTargetDirectory, "Data");
+        public static readonly string ModOrderFile = Path.Combine(ModManagerDirectory, "mods.txt");
 
         /// <summary>
-        /// Loads plugin data from file and converts it into a format usuable by Avalonia UI. <br/>
+        /// Loads plugins found in <see cref="GameDataTargetDirectory"/> and <see cref="ModsDirectory"/> into a format Avalonia UI can use. <br/>
+        /// Order is based on the contents of <see cref="PluginOrderFile"/>, but plugins are added and removed based on the contents of <see cref="GameDataTargetDirectory"/> and subdirectories in <see cref="ModsDirectory"/>. <br/>
         /// TODO: Handle cases where there are duplicates in a dodgily setup plugins.txt, preferring to stick with active plugins over non-active duplicates? <br/>
-        /// TODO: See if you can create a plugin with an asterick at the start of the name and what happens. <br/>
         /// TODO: Show core plugins, and handle missing ones. With SE/AE it doesn't really matter as you can't disable DLC anyway. <br/>
         /// </summary>
+        /// <remarks>
+        /// Windows cannot have an asterick in file/directory names, meaning we know that an asterick is likely not a part of the mod's name. <br/>
+        /// On Linux you can get files with astericks in the name, but it's convulted to do and is unlikely to occur. <br/>
+        /// </remarks>
         public static void LoadPlugins(ObservableCollection<PluginData> referencedPlugins)
         {
-            var plugins = new List<PluginData>();
-            List<string> unformattedPlugins = new();
-            if (File.Exists(PluginFilePath))
-                unformattedPlugins = File.ReadAllLines(PluginFilePath).ToList();
-
-            unformattedPlugins = unformattedPlugins.Concat(GetFilesFromData()).ToList();
-
-            foreach (string plugin in unformattedPlugins)
+            List<string> pluginOrder = new(); // These plugins might not exist due to external user action, but determine priority based on their order.
+            if (File.Exists(PluginOrderFile))
             {
-                if (plugin[0] == '*') // Asterick at start of plugin name means it's an active plugin. 
-                {
-                    plugins.Add(new PluginData(plugin.Substring(1), true, referencedPlugins));
-                }
-                else
-                {
-                    plugins.Add(new PluginData(plugin, false, referencedPlugins));
-                }
+                pluginOrder = File.ReadAllLines(PluginOrderFile).ToList();
+            }
+
+            // Get plugins from directory, priority doesn't matter as this is to check if a plugin still exists or if a new plugin has been added externally.
+            List<string> existingPlugins = GetPluginNamesFromDataDirectory().ToList();
+            existingPlugins = existingPlugins.Concat(GetPluginNamesFromModDirectory()).ToList();
+
+            List<string> potentialMods = pluginOrder.Concat(existingPlugins).ToList();
+            List<PluginData> plugins = new();
+            foreach (string plugin in potentialMods)
+            {
+                var isActive = plugin[0] == '*';
+                var name = isActive ? plugin.Substring(1) : plugin;
+
+                if (!existingPlugins.Contains(name)) // Existing plugins will never contain an asterick as they are retrieved from a directory, so we can use that to check if a plugin still exists.
+                    continue;
+
+                plugins.Add(new PluginData(name, isActive, referencedPlugins));
             }
 
             // Remove core plugins from managed plugins as we can't do anything with them anyway. This is different for other Bethesda games.
             string[] corePlugins = new[] { "skyrim.esm", "update.esm", "dawnguard.esm", "hearthfires.esm", "dragonborn.esm" }; // Store as lower case for comparison's sake. TODO: Make a global specific to different games.
 
             referencedPlugins.Clear(); // Clear to prevent duplicates if LoadPlugins is called more than once.
-            foreach (var plugin in plugins.Distinct(PluginDuplicateEqualityComparer.Instance).Where(plugin => !corePlugins.Contains(plugin.Name.ToLower())))
+            foreach (var plugin in plugins.Distinct(PluginDuplicateEqualityComparer.Instance).Where(plugin => !corePlugins.Contains(plugin.Name.ToLower()))) // Add only the plugins that aren't duplicates (names are unique) or core plugins. Order is important when distincting as it determines priority.
             {
-                referencedPlugins.Add(plugin); // Remove core plugins from plugins.
+                referencedPlugins.Add(plugin);
             }
 
-            SavePlugins(referencedPlugins); // SavePlugins in case we need to create the file or update with any newly found plugins.
+            SavePluginOrder(referencedPlugins); // SavePlugins in case we need to create the file or update with any newly found plugins.
         }
 
         /// <summary>
@@ -62,50 +75,124 @@ namespace ModManager
         /// <remarks>
         /// Gets called every time a change is made to the plugin order.
         /// </remarks>
-        public static void SavePlugins(ObservableCollection<PluginData> plugins)
+        public static void SavePluginOrder(ObservableCollection<PluginData> plugins)
         {
             string[] formattedPlugins = plugins.Select(plugin => (plugin.IsActive ? "*" : "") + plugin.Name).ToArray(); // Add back the asterick to denote an active plugin.
 
-            if (!File.Exists(PluginFilePath))
-                File.Create(PluginFilePath).Close();
+            if (!File.Exists(PluginOrderFile))
+                File.Create(PluginOrderFile).Close();
 
-            File.WriteAllLines(PluginFilePath, formattedPlugins);
+            File.WriteAllLines(PluginOrderFile, formattedPlugins);
         }
 
         /// <summary>
-        /// test
+        /// Loads mods found in <see cref="ModsDirectory"/> into a format Avalonia UI can use. <br/>
+        /// Order is based on the contents of <see cref="ModOrderFile"/>, but mods are added and removed based on the contents of <see cref="ModsDirectory"/>. <br/>
         /// </summary>
-        /// <returns> A <see cref="IEnumerable&lt;<string&lt;>"/> thigny </returns>
-        public static IEnumerable<string> GetFilesFromData() =>
-            Directory.EnumerateFiles(GameDataPath, "*.esm", SearchOption.TopDirectoryOnly)
-                .Concat(Directory.EnumerateFiles(GameDataPath, "*.esp", SearchOption.TopDirectoryOnly))
-                .Concat(Directory.EnumerateFiles(GameDataPath, "*.esl", SearchOption.TopDirectoryOnly))
+        public static void LoadMods(ObservableCollection<ModData> referencedMods)
+        {
+            List<string> modOrder = new(); // These plugins might not exist due to external user action, but determine priority based on their order.
+            if (File.Exists(ModOrderFile))
+            {
+                modOrder = File.ReadAllLines(ModOrderFile).ToList();
+            }
+
+            // Get mods from directory, priority doesn't matter as this is to check if a mod still exists or if a new mod has been added externally.
+            Directory.CreateDirectory(ModsDirectory);
+            List<string> existingMods = GetModNamesFromModFolder().ToList(); // These mods definitely exist, but might not have been created by the manager and are posssibly missing meta data.
+
+
+            List<string> potentialMods = modOrder.Concat(existingMods).ToList();
+            List<ModData> mods = new();
+            foreach (string mod in potentialMods)
+            {
+                var isActive = mod[0] == '*';
+                var name = isActive ? mod.Substring(1) : mod;
+
+                if (!existingMods.Contains(name)) // Existing mods will never contain an asterick as they are retrieved from a directory, so we can use that to check if a mod still exists.
+                { 
+                    continue;
+                }
+
+                mods.Add(new ModData(name, isActive, referencedMods));
+            }
+
+            referencedMods.Clear();
+            foreach (var mod in mods.Distinct(ModDuplicateEqualityComparer.Instance)) // Add non-dupes to the main list.  Order is important when distincting as it determines priority.
+            {
+                referencedMods.Add(mod);
+            }
+
+            SaveModOrder(referencedMods);
+        }
+
+        public static void SaveModOrder(ObservableCollection<ModData> mods)
+        {
+            string[] formattedMods = mods.Select(mod => (mod.IsActive ? "*" : "") + mod.Name).ToArray(); // Add back the asterick to denote an active plugin. May as well follow the Bethesda convention.
+
+            if (!File.Exists(ModOrderFile))
+                File.Create(ModOrderFile).Close();
+
+            File.WriteAllLines(ModOrderFile, formattedMods);
+        }
+
+        public static IEnumerable<string> GetPluginNamesFromDataDirectory() =>
+            Directory.EnumerateFiles(GameDataSourceDirectory, "*.esm", SearchOption.TopDirectoryOnly)
+                .Concat(Directory.EnumerateFiles(GameDataSourceDirectory, "*.esp", SearchOption.TopDirectoryOnly))
+                .Concat(Directory.EnumerateFiles(GameDataSourceDirectory, "*.esl", SearchOption.TopDirectoryOnly))
                 .Select(path => Path.GetFileName(path)) // Get only the file name and extension.
                 .OrderBy(file => file); // Order alphabetically
 
-        public static void CreateHardLinks(string directory)
+        public static IEnumerable<string> GetModNamesFromModFolder() =>
+            Directory.GetDirectories(ModsDirectory)
+                .Select(path => Path.GetFileName(path))
+                .OrderBy(directory => directory);
+
+        private static List<string> GetPluginNamesFromModDirectory()
         {
-            var directoryInfo = new DirectoryInfo(directory);
-            foreach (var file in directoryInfo.EnumerateFiles())
+            List<string> pluginNames = new List<string>();
+            foreach (string currentDirectory in Directory.GetDirectories(ModsDirectory))
             {
-                var oldFileRelative = Path.GetRelativePath(GamePath, file.FullName);
-                var newDirectory = ModManagerGamePath + Path.GetDirectoryName(oldFileRelative);
-                var newFile = ModManagerGamePath + oldFileRelative;
-
-                Directory.CreateDirectory(newDirectory); // win api will not create hardlink if directory doesn't exist
-
-                Kernel32.CreateHardLink(newFile, file.FullName, IntPtr.Zero);
+                pluginNames.Add(Directory.EnumerateFiles(currentDirectory, "*.esm", SearchOption.TopDirectoryOnly)
+                                    .Concat(Directory.EnumerateFiles(currentDirectory, "*.esp", SearchOption.TopDirectoryOnly))
+                                    .Concat(Directory.EnumerateFiles(currentDirectory, "*.esl", SearchOption.TopDirectoryOnly))
+                                    .Select(path => Path.GetFileName(path)) // Get only the file name and extension.
+                                    .OrderBy(file => file)); // Order alphabetically
             }
 
-            foreach (var dir in directoryInfo.EnumerateDirectories())
+            return pluginNames;
+        }
+
+        public static void CreateHardLinks(string source, string target) // Thank you, https://github.com/Sonozuki.
+        {
+            var directoriesToLink = new Queue<string>();
+            directoriesToLink.Enqueue(source);
+
+            while (directoriesToLink.Any())
             {
-                CreateHardLinks(dir.FullName);
+                var directoryInfo = new DirectoryInfo(directoriesToLink.Dequeue());
+
+                foreach (var file in directoryInfo.EnumerateFiles())
+                {
+                    var oldFileRelative = Path.GetRelativePath(source, file.FullName);
+                    var newDirectory = Path.Combine(target, Path.GetDirectoryName(oldFileRelative)!);
+                    var newFile = Path.Combine(target, oldFileRelative);
+
+                    Directory.CreateDirectory(newDirectory); // CreateHardLink won't automatically create the directory
+
+                    if (!Kernel32.CreateHardLink(newFile, file.FullName, IntPtr.Zero))
+                        Console.WriteLine($"Error occured when creating hardlink for file: {newFile}. Error code: {Marshal.GetLastWin32Error()}");
+                }
+
+                foreach (var dir in directoryInfo.EnumerateDirectories())
+                    directoriesToLink.Enqueue(dir.FullName);
             }
         }
+
+        private static class Kernel32
+        {
+            [DllImport("Kernel32", SetLastError = true, CharSet = CharSet.Unicode)]
+            public static extern bool CreateHardLink(string fileName, string existingFileName, IntPtr securityAttributes);
+        }
     }
-}
-internal static class Kernel32
-{
-    [DllImport("Kernel32")]
-    public static extern bool CreateHardLink(string fileName, string existingFileName, IntPtr securityAttributes);
 }

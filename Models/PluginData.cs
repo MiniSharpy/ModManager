@@ -19,12 +19,12 @@ namespace ModManager.Models
         public string Name { get; set; }
 
         /// <remarks>
-        /// Setter automatically calls <see cref="FileIO.SavePlugins"/> with <see cref="Plugins"/> as the parameter. This is because AvaloniaUI can be limited (articuraly with datagrids) and not allow multiple bindings on change. TODO: Look into DataGridTemplates, might be a way around this.
+        /// Setter automatically calls <see cref="FileIO.SavePluginOrder"/> with <see cref="Plugins"/> as the parameter. This is because AvaloniaUI can be limited (articuraly with datagrids) and not allow multiple bindings on change. TODO: Look into DataGridTemplates, might be a way around this.
         /// </remarks>
         public bool IsActive
         {
             get { return _IsActive; }
-            set { _IsActive = value; FileIO.SavePlugins(Plugins); }
+            set { _IsActive = value; FileIO.SavePluginOrder(Plugins); }
         }
 
         /// <summary>
@@ -44,7 +44,7 @@ namespace ModManager.Models
                 // and to ensure everything gets updated with the changed values.
                 Dispatcher.UIThread.Post(() => Plugins.RemoveAt(Priority)); 
                 Dispatcher.UIThread.Post(() => Plugins.Insert(value, this)); 
-                Dispatcher.UIThread.Post(() => FileIO.SavePlugins(Plugins));
+                Dispatcher.UIThread.Post(() => FileIO.SavePluginOrder(Plugins));
 
                 // Tell Avalonia that Priority has been updated, need to run on entire collection as the priority is linked to index
                 foreach (var plugin in Plugins)
