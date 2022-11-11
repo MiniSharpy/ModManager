@@ -6,6 +6,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.IO;
 using System.Linq;
+using System;
 
 namespace ModManager.Models
 {
@@ -16,6 +17,9 @@ namespace ModManager.Models
         private bool _IsActive;
         public string Name { get; set; }
 
+        /// <summary>
+        /// Alters <see cref="AllPlugins"/> by adding or removing a plugin when changed.
+        /// </summary>
         public bool IsActive
         {
             get { return _IsActive; }
@@ -58,7 +62,8 @@ namespace ModManager.Models
             get { return AllMods.IndexOf(this); }
             set
             {
-                if (value < 0 || value >= AllMods.Count) { return; } // Stop out of range exception.
+                value = Math.Max(value, 0); // Stop out of range exceptions.
+                value = Math.Min(value, AllMods.Count - 1); // -1 as we're about to remove an element.
 
                 // Use UI thread to avoid Null Reference Exception when Avalonia get confused by changes to the collection
                 // and to ensure everything gets updated with the changed values.

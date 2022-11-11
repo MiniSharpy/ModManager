@@ -39,7 +39,8 @@ namespace ModManager.Models
             get { return Plugins.IndexOf(this); }
             set
             {
-                if (value < 0 || value >= Plugins.Count) { return; } // Stop out of range exception.
+                value = Math.Max(value, 0); // Stop out of range exceptions.
+                value = Math.Min(value, Plugins.Count - 1); // -1 as we're about to remove an element.
 
                 // Use UI thread to avoid Null Reference Exception when Avalonia get confused by changes to the collection
                 // and to ensure everything gets updated with the changed values.
