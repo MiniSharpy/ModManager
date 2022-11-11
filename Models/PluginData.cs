@@ -70,7 +70,7 @@ namespace ModManager.Models
             Plugins = plugins;
 
         }
-
+        public void UpdatePriorityInAvalonia() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("Priority"));
         private void NotifyPropertyChanged([CallerMemberName] string propertyName = "") => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 

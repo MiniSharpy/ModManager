@@ -45,12 +45,12 @@ namespace ModManager.Models
                 }
                 Dispatcher.UIThread.Post(() => FileIO.SavePluginOrder(AllPlugins));
 
-                // Tell Avalonia that Priority has been updated, need to run on entire collection as the priority is linked to index
-                foreach (var plugin in AllMods)
+                // Tell Avalonia that IsActive has been updated, need to run on entire collection as the priority is linked to index
+                foreach (var plugin in AllPlugins)
                 {
-                    Dispatcher.UIThread.Post(() => plugin.NotifyPropertyChanged());
+                    Dispatcher.UIThread.Post(() => plugin.UpdatePriorityInAvalonia());
                 }
-            }
+            }   
         }
 
         public int Priority
@@ -67,9 +67,9 @@ namespace ModManager.Models
                 Dispatcher.UIThread.Post(() => FileIO.SaveModOrder(AllMods));
 
                 // Tell Avalonia that Priority has been updated, need to run on entire collection as the priority is linked to index
-                foreach (var plugin in AllMods)
+                foreach (var mod in AllMods)
                 {
-                    Dispatcher.UIThread.Post(() => plugin.NotifyPropertyChanged());
+                    Dispatcher.UIThread.Post(() => mod.NotifyPropertyChanged());
                 }
             }
         }
