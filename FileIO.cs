@@ -23,7 +23,7 @@ namespace ModManager
         public static readonly string ModOrderFile = Path.Combine(ModManagerDirectory, "mods.txt");
 
         /// <summary>
-        /// Loads plugins found in <see cref="GameDataTargetDirectory"/> and <see cref="ModsDirectory"/> into a format Avalonia UI can use. <br/>
+        /// Loads plugins found in <see cref="GameDataTargetDirectory"/> and <see cref="ModsDirectory"/> into a format Avalonia UI can use and then resaves to account for missing/additional plugins. <br/>
         /// Order is based on the contents of <see cref="PluginOrderFile"/>, but plugins are added and removed based on the contents of <see cref="GameDataTargetDirectory"/> and subdirectories in <see cref="ModsDirectory"/>. <br/>
         /// TODO: Handle cases where there are duplicates in a dodgily setup plugins.txt, preferring to stick with active plugins over non-active duplicates? <br/>
         /// TODO: Show core plugins, and handle missing ones. With SE/AE it doesn't really matter as you can't disable DLC anyway. <br/>
@@ -87,7 +87,7 @@ namespace ModManager
         }
 
         /// <summary>
-        /// Loads mods found in <see cref="ModsDirectory"/> into a format Avalonia UI can use. <br/>
+        /// Loads mods found in <see cref="ModsDirectory"/> into a format Avalonia UI can use and then resaves to account for missing/additional mods. <br/>
         /// Order is based on the contents of <see cref="ModOrderFile"/>, but mods are added and removed based on the contents of <see cref="ModsDirectory"/>. <br/>
         /// </summary>
         public static void LoadMods(ObservableCollection<ModData> mods, ObservableCollection<PluginData> plugins)

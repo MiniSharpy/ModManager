@@ -29,25 +29,7 @@ namespace ModManager.Models
                 FileIO.SaveModOrder(AllMods);
 
                 // Updates plugins.
-                if (IsActive) // Add plugin to collection, disabled by default.
-                {
-                    foreach (var plugin in Plugins)
-                    {
-                        Dispatcher.UIThread.Post(() => AllPlugins.Add(new PluginData(plugin, false, AllPlugins))); 
-                    }
-                }
-                else // Remove plugin from collection.
-                {
-                    IEnumerable<PluginData> plugins = AllPlugins.Where(plugin => Plugins.Contains(plugin.Name));
-
-                    foreach (var plugin in plugins)
-                    {
-
-                        Dispatcher.UIThread.Post(() => AllPlugins.Remove(plugin));
-
-                    }
-                }
-                Dispatcher.UIThread.Post(() => FileIO.SavePluginOrder(AllPlugins));
+                FileIO.LoadPlugins(AllPlugins, AllMods);
 
                 // Tell Avalonia that IsActive has been updated, need to run on entire collection as the priority is linked to index
                 foreach (var plugin in AllPlugins)
