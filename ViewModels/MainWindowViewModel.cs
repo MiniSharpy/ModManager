@@ -24,7 +24,6 @@ namespace ModManager.ViewModels
         static public ObservableCollection<PluginData> Plugins { get; } = new();
         static public ObservableCollection<ModData> Mods { get; } = new();
 
-
         public MainWindowViewModel()
         {
             FileIO.LoadMods(Mods, Plugins);
@@ -61,10 +60,10 @@ namespace ModManager.ViewModels
             Process.Start(info);
         }
 
-        public static string? TestPath { get; set; }
+        public static string? CompressedModPath { get; set; }
         public static async void InstallMod()
         {
-            string? sourceArchive = TestPath;
+            string? sourceArchive = CompressedModPath;
             if (!File.Exists(sourceArchive)) // Shouldn't occur with picking through file dialog, but just in case.
             {
                 // TODO: Report error.

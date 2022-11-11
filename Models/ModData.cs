@@ -33,7 +33,7 @@ namespace ModManager.Models
                 {
                     foreach (var plugin in Plugins)
                     {
-                        AllPlugins.Add(new PluginData(plugin, false, AllPlugins));
+                        Dispatcher.UIThread.Post(() => AllPlugins.Add(new PluginData(plugin, false, AllPlugins))); 
                     }
                 }
                 else // Remove plugin from collection.
