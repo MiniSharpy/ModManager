@@ -10,30 +10,38 @@ using System.Linq;
 
 namespace ModManager.ViewModels
 {
-    // TODO: Ensure view updates correctly when data is changed. E.G. When a mod is enabled, show plugin in plugin side.
     public class MainWindowViewModel : ReactiveObject
     {
         /// <summary>
-        /// A list of all plugins where index is plugin priority. 
+        /// A list of all plugins where index is plugin priority.
         /// </summary>
         /// <remarks>
-        /// PluginData relies on a reference to Plugins, as of such setting after initalisation is disabled. <br/>
-        /// Alter the collection (though not neccesarily the elements) via the UI thread (<see cref="Dispatcher.UIThread"/>). For example when removing an element by index do ``Dispatcher.UIThread.Post(() => Plugins.RemoveAt(Priority));`` 
-        /// to avoid a <see cref="NullReferenceException"/>.
+        /// <see cref="Plugin"/> relies on a reference to <see langword="this"/>, as of such setting after initialisation is disabled.<br/>
+        /// Alter the collection (though not necessarily the elements) via the UI thread (<see cref="Dispatcher.UIThread"/>). For example when removing an element by index do <c>Dispatcher.UIThread.Post(() => Plugins.RemoveAt(Priority));</c>
+        /// to avoid a <see cref="NullReferenceException"/> and other unexpected behaviour.
         /// </remarks>
-        static public ObservableCollection<PluginData> Plugins { get; } = new();
-        static public ObservableCollection<ModData> Mods { get; } = new();
+        static public ObservableCollection<Plugin> Plugins { get; } = new();
+
+        /// <summary>
+        /// A list of all mods where index is mod priority. 
+        /// </summary>
+        /// <remarks>
+        /// <see cref="Mod"/> relies on a reference to <see langword="this"/>, as of such setting after initialisation is disabled.<br/>
+        /// Alter the collection (though not necessarily the elements) via the UI thread (<see cref="Dispatcher.UIThread"/>). For example when removing an element by index do <c>Dispatcher.UIThread.Post(() => Plugins.RemoveAt(Priority));</c>
+        /// to avoid a <see cref="NullReferenceException"/> and other unexpected behaviour.
+        /// </remarks>
+        static public ObservableCollection<Mod> Mods { get; } = new();
 
         public MainWindowViewModel()
         {
-            FileIO.LoadMods(Mods, Plugins);
-            FileIO.LoadPlugins(Plugins, Mods);
+            FileIO.LoadModsAndSaveChanges(Mods, Plugins);
+            FileIO.LoadPluginsAndSaveChanges(Plugins, Mods);
         }
 
         public static void RunGame()
         {
             string? gamePathPartition = Path.GetPathRoot(FileIO.GameDataSourceDirectory);
-            string? managerPathPartition = Path.GetPathRoot(Directory.GetCurrentDirectory());
+            string? managerPathPartition = Path.GetPathRoot(FileIO.ModManagerDirectory);
             if (gamePathPartition != managerPathPartition) { return; } // Hardlinking is only supported on the same partition. TODO: Give an error. We kinda need this feature.
 
             if (Directory.Exists(FileIO.GameTargetDirectory))  // Clean up so deleted mods don't remain.
@@ -43,13 +51,13 @@ namespace ModManager.ViewModels
 
             FileIO.CreateHardLinks(FileIO.GameSourceDirectory, FileIO.GameTargetDirectory); // Hardlink the vanilla game.
 
-            IEnumerable<ModData> activeMods = Mods.Where(plugin => plugin.IsActive).Reverse(); // Hard Links can't overwrite, so just hard link backwards.
-            foreach (ModData mod in activeMods) // Hardlink the mods. TODO: Check if root mod.
+            IEnumerable<Mod> activeMods = Mods.Where(plugin => plugin.IsActive).Reverse(); // When creating hard links through the Win32 API if a file exists it won't be overwrote, so reverse the mods to be hard linked and then hard link that way. TODO: What if there's a core file to be overwrote?
+            foreach (Mod mod in activeMods) // Hardlink the mods. TODO: Check if root mod.
             {
                 FileIO.CreateHardLinks(mod.SourceDirectory, FileIO.GameDataTargetDirectory);
             }
 
-            string path = Path.Combine(FileIO.GameTargetDirectory, "Skyrim.ccc"); // Skyrim.ccc overides plugins.txt. TODO: Have a collection of files to delete?
+            string path = Path.Combine(FileIO.GameTargetDirectory, "Skyrim.ccc"); // Skyrim.ccc overrides plugins.txt. TODO: Have a collection of files to delete?
             if (File.Exists(path))
             {
                 File.Delete(path);
@@ -61,10 +69,11 @@ namespace ModManager.ViewModels
         }
 
         public static string? CompressedModPath { get; set; }
+
         public static async void InstallMod()
         {
             string? sourceArchive = CompressedModPath;
-            if (!File.Exists(sourceArchive)) // Shouldn't occur with picking through file dialog, but just in case.
+            if (!File.Exists(sourceArchive)) // Shouldn't occur with picking through file dialogue, but just in case.
             {
                 // TODO: Report error.
                 return;
@@ -89,8 +98,8 @@ namespace ModManager.ViewModels
             process.PriorityClass = ProcessPriorityClass.High;
             await process.WaitForExitAsync();
 
-            FileIO.LoadMods(Mods, Plugins);
-            FileIO.LoadPlugins(Plugins, Mods);
+            FileIO.LoadModsAndSaveChanges(Mods, Plugins);
+            FileIO.LoadPluginsAndSaveChanges(Plugins, Mods);
         }
     }
 }

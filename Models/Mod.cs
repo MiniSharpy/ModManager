@@ -10,15 +10,16 @@ using System;
 
 namespace ModManager.Models
 {
-    public class ModData : INotifyPropertyChanged
+    public class Mod : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler? PropertyChanged;
 
         private bool _IsActive;
+
         public string Name { get; set; }
 
         /// <summary>
-        /// Alters <see cref="AllPlugins"/> by adding or removing a plugin when changed.
+        /// Setter alters <see cref="Plugins"/> by adding or removing <see cref="ManagedPlugins"/> when enabled or disabled.
         /// </summary>
         public bool IsActive
         {
@@ -26,73 +27,94 @@ namespace ModManager.Models
             set
             {
                 _IsActive = value;
-                FileIO.SaveModOrder(AllMods);
+                FileIO.SaveModOrder(Mods);
 
-                // Updates plugins.
-                FileIO.LoadPlugins(AllPlugins, AllMods);
+                FileIO.LoadPluginsAndSaveChanges(Plugins, Mods);
 
                 // Tell Avalonia that IsActive has been updated, need to run on entire collection as the priority is linked to index
-                foreach (var plugin in AllPlugins)
+                foreach (var plugin in Plugins)
                 {
                     Dispatcher.UIThread.Post(() => plugin.UpdatePriorityInAvalonia());
                 }
             }   
         }
 
+        /// <summary>
+        /// Priority determines what files overwrite another in a mod order, with a lower value being a lower priority and getting overwritten by higher priority mods.
+        /// </summary>
+        /// <remarks>
+        /// Priority is determined by the <see cref="Mod"/>'s index in <see cref="Mods"/>.
+        /// </remarks>
         public int Priority
         {
-            get { return AllMods.IndexOf(this); }
+            get { return Mods.IndexOf(this); }
             set
             {
-                value = Math.Max(value, 0); // Stop out of range exceptions.
-                value = Math.Min(value, AllMods.Count - 1); // -1 as we're about to remove an element.
+                value = Math.Clamp(value, 0, Mods.Count - 1);
 
                 // Use UI thread to avoid Null Reference Exception when Avalonia get confused by changes to the collection
                 // and to ensure everything gets updated with the changed values.
-                Dispatcher.UIThread.Post(() => AllMods.RemoveAt(Priority));
-                Dispatcher.UIThread.Post(() => AllMods.Insert(value, this));
-                Dispatcher.UIThread.Post(() => FileIO.SaveModOrder(AllMods));
+                Dispatcher.UIThread.Post(() => Mods.RemoveAt(Priority));
+                Dispatcher.UIThread.Post(() => Mods.Insert(value, this));
+                Dispatcher.UIThread.Post(() => FileIO.SaveModOrder(Mods));
 
                 // Tell Avalonia that Priority has been updated, need to run on entire collection as the priority is linked to index
-                foreach (var mod in AllMods)
+                foreach (var mod in Mods)
                 {
                     Dispatcher.UIThread.Post(() => mod.NotifyPropertyChanged());
                 }
             }
         }
 
+        /// <summary>
+        /// The path to the directory containing all the files managed by a <see cref="Mod"/>.
+        /// </summary>
         public string SourceDirectory => Path.Combine(FileIO.ModsDirectory, Name);
 
-        public IEnumerable<string> Plugins => FileIO.GetPluginNamesFromDirectory(SourceDirectory);
+        /// <summary>
+        /// The paths to each plugin file managed by a <see cref="Mod"/>.
+        /// </summary>
+        public IEnumerable<string> ManagedPlugins => FileIO.GetPluginNamesFromDirectory(SourceDirectory);
 
+        /// <summary>
+        /// A reference to <see cref="ModManager.ViewModels.MainWindowViewModel.Mods"/>.
+        /// </summary>
         /// <remarks>
-        /// Should always have the same values as the original.
+        /// Should always be the same reference as the original.
         /// </remarks>
-        private ObservableCollection<ModData> AllMods { get; }
-        private ObservableCollection<PluginData> AllPlugins { get; }
+        private ObservableCollection<Mod> Mods { get; }
 
-        public ModData(string name, bool isActive, ObservableCollection<ModData> mods, ObservableCollection<PluginData> plugins)
+        /// <summary>
+        /// A reference to <see cref="ModManager.ViewModels.MainWindowViewModel.Plugins"/>.
+        /// </summary>
+        /// <remarks>
+        /// Should always be the same reference as the original.
+        /// </remarks>
+        private ObservableCollection<Plugin> Plugins { get; }
+
+        public Mod(string name, bool isActive, ObservableCollection<Mod> mods, ObservableCollection<Plugin> plugins)
         {
             Name = name;
             _IsActive = isActive; // Directly set backing field to avoid calling FileIO.Save in the property. This is to stop it running potentially hundreds of times during initial setup as it can be called manually anyway.
-            AllMods = mods;
-            AllPlugins = plugins;
+            Mods = mods;
+            Plugins = plugins;
         }
 
         private void NotifyPropertyChanged([CallerMemberName] string propertyName = "") => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
-    internal class ModDuplicateEqualityComparer : IEqualityComparer<ModData>
+
+    internal class ModDuplicateEqualityComparer : IEqualityComparer<Mod>
     {
         public static ModDuplicateEqualityComparer Instance { get; } = new();
 
         private ModDuplicateEqualityComparer() { }
 
-        public bool Equals(ModData? x, ModData? y)
+        public bool Equals(Mod? x, Mod? y)
         {
             return x?.Name.ToLower() == y?.Name.ToLower();
         }
 
-        public int GetHashCode([DisallowNull] ModData obj)
+        public int GetHashCode([DisallowNull] Mod obj)
         {
             return obj.Name.ToLower().GetHashCode();
         }
