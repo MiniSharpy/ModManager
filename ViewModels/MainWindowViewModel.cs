@@ -1,17 +1,16 @@
 using Avalonia.Threading;
 using ModManager.Models;
 using ReactiveUI;
-using SharpCompress.Archives;
-using SharpCompress.Archives.SevenZip;
-using SharpCompress.Common;
-using SharpCompress.Readers;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 
 namespace ModManager.ViewModels
 {
+    // TODO: Ensure view updates correctly when data is changed. E.G. When a mod is enabled, show plugin in plugin side.
     public class MainWindowViewModel : ReactiveObject
     {
         /// <summary>
@@ -28,8 +27,8 @@ namespace ModManager.ViewModels
 
         public MainWindowViewModel()
         {
-            FileIO.LoadPlugins(Plugins);
-            FileIO.LoadMods(Mods);
+            FileIO.LoadMods(Mods, Plugins);
+            FileIO.LoadPlugins(Plugins, Mods);
         }
 
         public static void RunGame()
@@ -44,9 +43,11 @@ namespace ModManager.ViewModels
             }
 
             FileIO.CreateHardLinks(FileIO.GameSourceDirectory, FileIO.GameTargetDirectory); // Hardlink the vanilla game.
-            foreach (string modDirectory in Directory.GetDirectories(FileIO.ModsDirectory)) // Hardlink the mods. TODO: Load in order of mod list, only adding active. TODO: Check if root mod.
+
+            IEnumerable<ModData> activeMods = Mods.Where(plugin => plugin.IsActive).Reverse(); // Hard Links can't overwrite, so just hard link backwards.
+            foreach (ModData mod in activeMods) // Hardlink the mods. TODO: Check if root mod.
             {
-                FileIO.CreateHardLinks(modDirectory, FileIO.GameDataTargetDirectory);
+                FileIO.CreateHardLinks(mod.SourceDirectory, FileIO.GameDataTargetDirectory);
             }
 
             string path = Path.Combine(FileIO.GameTargetDirectory, "Skyrim.ccc"); // Skyrim.ccc overides plugins.txt. TODO: Have a collection of files to delete?
@@ -61,51 +62,36 @@ namespace ModManager.ViewModels
         }
 
         public static string? TestPath { get; set; }
-        public static void InstallMod()
+        public static async void InstallMod()
         {
-            string? path = TestPath;
-            if (!File.Exists(path)) // Shouldn't occur with picking through file dialog, but just in case.
+            string? sourceArchive = TestPath;
+            if (!File.Exists(sourceArchive)) // Shouldn't occur with picking through file dialog, but just in case.
             {
                 // TODO: Report error.
                 return;
             }
 
-            using Stream stream = File.OpenRead(path);
-            if (SevenZipArchive.IsSevenZipFile(stream))
-            {
-                using IArchive archive = ArchiveFactory.Open(stream);
+            string modName = Path.GetFileNameWithoutExtension(sourceArchive);
+            string modDirectory = Path.Combine(FileIO.ModsDirectory, modName);
+            Directory.CreateDirectory(modDirectory);
 
-                IReader reader = archive.ExtractAllEntries(); // Should not need disposing.
-                ExtractToDirectory(reader, path);
-            }
+            string processName; // Thank you, https://github.com/Sonozuki.
+            if (OperatingSystem.IsWindows())
+                processName = "7z.exe";
+            else if (OperatingSystem.IsLinux())
+                processName = "7zzs";
             else
             {
-                using IReader reader = ReaderFactory.Open(stream);
-                ExtractToDirectory(reader, path);
+                Console.WriteLine("Invalid OS");
+                return;
             }
 
+            var process = Process.Start(processName, $"e -spf \"{sourceArchive}\" -o\"{modDirectory}\"");
+            process.PriorityClass = ProcessPriorityClass.High;
+            await process.WaitForExitAsync();
 
-            FileIO.LoadMods(Mods);
-
-            void ExtractToDirectory(IReader reader, string path)
-            {
-                string modName = Path.GetFileName(path);
-                string modPath = Path.Combine(FileIO.ModsDirectory, modName);
-                Directory.CreateDirectory(modPath);
-
-                while (reader.MoveToNextEntry())
-                {
-                    if (!reader.Entry.IsDirectory)
-                    {
-                        Console.WriteLine(reader.Entry.Key);
-                        reader.WriteEntryToDirectory(modPath, new ExtractionOptions()
-                        {
-                            ExtractFullPath = true,
-                            Overwrite = true
-                        });
-                    }
-                }
-            }
+            FileIO.LoadMods(Mods, Plugins);
+            FileIO.LoadPlugins(Plugins, Mods);
         }
     }
 }

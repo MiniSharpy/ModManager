@@ -30,43 +30,44 @@ namespace ModManager
         /// </summary>
         /// <remarks>
         /// Windows cannot have an asterick in file/directory names, meaning we know that an asterick is likely not a part of the mod's name. <br/>
-        /// On Linux you can get files with astericks in the name, but it's convulted to do and is unlikely to occur. <br/>
+        /// On Linux you can get files with astericks in the name, but it's convoluted to do and is unlikely to occur. <br/>
         /// </remarks>
-        public static void LoadPlugins(ObservableCollection<PluginData> referencedPlugins)
+        public static void LoadPlugins(ObservableCollection<PluginData> plugins, ObservableCollection<ModData> mods)
         {
             List<string> pluginOrder = new(); // These plugins might not exist due to external user action, but determine priority based on their order.
             if (File.Exists(PluginOrderFile))
             {
-                pluginOrder = File.ReadAllLines(PluginOrderFile).ToList();
+                pluginOrder = File.ReadAllLines(PluginOrderFile).ToList(); // 1. Load plugins.txt to determine order and if active.
             }
 
             // Get plugins from directory, priority doesn't matter as this is to check if a plugin still exists or if a new plugin has been added externally.
-            List<string> existingPlugins = GetPluginNamesFromDataDirectory().ToList();
-            existingPlugins = existingPlugins.Concat(GetPluginNamesFromModDirectory()).ToList();
+            IEnumerable<string> existingPlugins = GetPluginNamesFromDirectory(GameDataSourceDirectory); // 2. Load plugins in GameDataSource. These plugins exist, but have been created by the manager.
+            IEnumerable<string> pluginsForActiveMods = mods.Where(mod => mod.IsActive).SelectMany(mod => mod.Plugins); // 3. Load active plugins in ModsDirectory. All the plugins in ModsDirectory exist but might not need to be added to GameTargetDirectory and so shouldn't be managed.
+            existingPlugins = existingPlugins.Concat(pluginsForActiveMods);
 
-            List<string> potentialMods = pluginOrder.Concat(existingPlugins).ToList();
-            List<PluginData> plugins = new();
-            foreach (string plugin in potentialMods)
+            IEnumerable<string> potentialPlugins = pluginOrder.Concat(existingPlugins); // Plugin order must come first to get the correct priority.
+            List<PluginData> nonDistinctPlugins = new();
+            foreach (string plugin in potentialPlugins)
             {
                 var isActive = plugin[0] == '*';
                 var name = isActive ? plugin.Substring(1) : plugin;
 
-                if (!existingPlugins.Contains(name)) // Existing plugins will never contain an asterick as they are retrieved from a directory, so we can use that to check if a plugin still exists.
+                if (!existingPlugins.Contains(name)) //4. Remove non-existance mods from mods.txt. Existing plugins will never contain an asterick as they are retrieved from a directory, so we can use that to check if a plugin still exists.
                     continue;
 
-                plugins.Add(new PluginData(name, isActive, referencedPlugins));
+                nonDistinctPlugins.Add(new PluginData(name, isActive, plugins));
             }
 
             // Remove core plugins from managed plugins as we can't do anything with them anyway. This is different for other Bethesda games.
             string[] corePlugins = new[] { "skyrim.esm", "update.esm", "dawnguard.esm", "hearthfires.esm", "dragonborn.esm" }; // Store as lower case for comparison's sake. TODO: Make a global specific to different games.
 
-            referencedPlugins.Clear(); // Clear to prevent duplicates if LoadPlugins is called more than once.
-            foreach (var plugin in plugins.Distinct(PluginDuplicateEqualityComparer.Instance).Where(plugin => !corePlugins.Contains(plugin.Name.ToLower()))) // Add only the plugins that aren't duplicates (names are unique) or core plugins. Order is important when distincting as it determines priority.
+            plugins.Clear(); // Clear to prevent duplicates if LoadPlugins is called more than once.
+            foreach (var plugin in nonDistinctPlugins.Distinct(PluginDuplicateEqualityComparer.Instance).Where(plugin => !corePlugins.Contains(plugin.Name.ToLower()))) // Add only the plugins that aren't duplicates (names are unique) or core plugins. Order is important when distincting as it determines priority.
             {
-                referencedPlugins.Add(plugin);
+                plugins.Add(plugin);
             }
 
-            SavePluginOrder(referencedPlugins); // SavePlugins in case we need to create the file or update with any newly found plugins.
+            SavePluginOrder(plugins); // SavePlugins in case we need to create the file or update with any newly found plugins.
         }
 
         /// <summary>
@@ -89,41 +90,41 @@ namespace ModManager
         /// Loads mods found in <see cref="ModsDirectory"/> into a format Avalonia UI can use. <br/>
         /// Order is based on the contents of <see cref="ModOrderFile"/>, but mods are added and removed based on the contents of <see cref="ModsDirectory"/>. <br/>
         /// </summary>
-        public static void LoadMods(ObservableCollection<ModData> referencedMods)
+        public static void LoadMods(ObservableCollection<ModData> mods, ObservableCollection<PluginData> plugins)
         {
             List<string> modOrder = new(); // These plugins might not exist due to external user action, but determine priority based on their order.
             if (File.Exists(ModOrderFile))
             {
-                modOrder = File.ReadAllLines(ModOrderFile).ToList();
+                modOrder = File.ReadAllLines(ModOrderFile).ToList(); // 1. Load mods.txt to determine order and if active.
             }
 
             // Get mods from directory, priority doesn't matter as this is to check if a mod still exists or if a new mod has been added externally.
             Directory.CreateDirectory(ModsDirectory);
-            List<string> existingMods = GetModNamesFromModFolder().ToList(); // These mods definitely exist, but might not have been created by the manager and are posssibly missing meta data.
+            List<string> existingMods = GetModNamesFromModDirectory().ToList(); // 2. Load mods in ModDirectory. These mods definitely exist, but might not have been created by the manager and are posssibly missing meta data.
 
 
-            List<string> potentialMods = modOrder.Concat(existingMods).ToList();
-            List<ModData> mods = new();
+            List<string> potentialMods = modOrder.Concat(existingMods).ToList(); // Mod order must come first to get the correct priority.
+            List<ModData> nonDistinctMods = new();
             foreach (string mod in potentialMods)
             {
                 var isActive = mod[0] == '*';
                 var name = isActive ? mod.Substring(1) : mod;
 
-                if (!existingMods.Contains(name)) // Existing mods will never contain an asterick as they are retrieved from a directory, so we can use that to check if a mod still exists.
+                if (!existingMods.Contains(name)) // 3. Remove non-existant mods from mods.txt. Existing mods will never contain an asterick as they are retrieved from a directory, so we can use that to check if a mod still exists.
                 { 
                     continue;
                 }
 
-                mods.Add(new ModData(name, isActive, referencedMods));
+                nonDistinctMods.Add(new ModData(name, isActive, mods, plugins));
             }
 
-            referencedMods.Clear();
-            foreach (var mod in mods.Distinct(ModDuplicateEqualityComparer.Instance)) // Add non-dupes to the main list.  Order is important when distincting as it determines priority.
+            mods.Clear();
+            foreach (var mod in nonDistinctMods.Distinct(ModDuplicateEqualityComparer.Instance)) // 4. Remove duplicates. Order is important when distincting as it determines priority.
             {
-                referencedMods.Add(mod);
+                mods.Add(mod);
             }
 
-            SaveModOrder(referencedMods);
+            SaveModOrder(mods);
         }
 
         public static void SaveModOrder(ObservableCollection<ModData> mods)
@@ -136,32 +137,17 @@ namespace ModManager
             File.WriteAllLines(ModOrderFile, formattedMods);
         }
 
-        public static IEnumerable<string> GetPluginNamesFromDataDirectory() =>
-            Directory.EnumerateFiles(GameDataSourceDirectory, "*.esm", SearchOption.TopDirectoryOnly)
-                .Concat(Directory.EnumerateFiles(GameDataSourceDirectory, "*.esp", SearchOption.TopDirectoryOnly))
-                .Concat(Directory.EnumerateFiles(GameDataSourceDirectory, "*.esl", SearchOption.TopDirectoryOnly))
+        public static IEnumerable<string> GetPluginNamesFromDirectory(string directory) =>
+            Directory.EnumerateFiles(directory, "*.esm", SearchOption.TopDirectoryOnly)
+                .Concat(Directory.EnumerateFiles(directory, "*.esp", SearchOption.TopDirectoryOnly))
+                .Concat(Directory.EnumerateFiles(directory, "*.esl", SearchOption.TopDirectoryOnly))
                 .Select(path => Path.GetFileName(path)) // Get only the file name and extension.
                 .OrderBy(file => file); // Order alphabetically
 
-        public static IEnumerable<string> GetModNamesFromModFolder() =>
+        public static IEnumerable<string> GetModNamesFromModDirectory() =>
             Directory.GetDirectories(ModsDirectory)
                 .Select(path => Path.GetFileName(path))
                 .OrderBy(directory => directory);
-
-        private static List<string> GetPluginNamesFromModDirectory()
-        {
-            List<string> pluginNames = new List<string>();
-            foreach (string currentDirectory in Directory.GetDirectories(ModsDirectory))
-            {
-                pluginNames.Add(Directory.EnumerateFiles(currentDirectory, "*.esm", SearchOption.TopDirectoryOnly)
-                                    .Concat(Directory.EnumerateFiles(currentDirectory, "*.esp", SearchOption.TopDirectoryOnly))
-                                    .Concat(Directory.EnumerateFiles(currentDirectory, "*.esl", SearchOption.TopDirectoryOnly))
-                                    .Select(path => Path.GetFileName(path)) // Get only the file name and extension.
-                                    .OrderBy(file => file)); // Order alphabetically
-            }
-
-            return pluginNames;
-        }
 
         public static void CreateHardLinks(string source, string target) // Thank you, https://github.com/Sonozuki.
         {

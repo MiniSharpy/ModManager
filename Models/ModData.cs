@@ -1,13 +1,11 @@
 ﻿using Avalonia.Threading;
-using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
+using System.IO;
+using System.Linq;
 
 namespace ModManager.Models
 {
@@ -21,41 +19,77 @@ namespace ModManager.Models
         public bool IsActive
         {
             get { return _IsActive; }
-            set { _IsActive = value; FileIO.SaveModOrder(Mods); }
-        }
-
-        public int Priority
-        {
-            get { return Mods.IndexOf(this); }
             set
             {
-                if (value < 0 || value >= Mods.Count ) { return; } // Stop out of range exception.
+                _IsActive = value;
+                FileIO.SaveModOrder(AllMods);
 
-                // Use UI thread to avoid Null Reference Exception when Avalonia get confused by changes to the collection
-                // and to ensure everything gets updated with the changed values.
-                Dispatcher.UIThread.Post(() => Mods.RemoveAt(Priority)); 
-                Dispatcher.UIThread.Post(() => Mods.Insert(value, this)); 
-                Dispatcher.UIThread.Post(() => FileIO.SaveModOrder(Mods));
+                // Updates plugins.
+                if (IsActive) // Add plugin to collection, disabled by default.
+                {
+                    foreach (var plugin in Plugins)
+                    {
+                        AllPlugins.Add(new PluginData(plugin, false, AllPlugins));
+                    }
+                }
+                else // Remove plugin from collection.
+                {
+                    IEnumerable<PluginData> plugins = AllPlugins.Where(plugin => Plugins.Contains(plugin.Name));
+
+                    foreach (var plugin in plugins)
+                    {
+
+                        Dispatcher.UIThread.Post(() => AllPlugins.Remove(plugin));
+
+                    }
+                }
+                Dispatcher.UIThread.Post(() => FileIO.SavePluginOrder(AllPlugins));
 
                 // Tell Avalonia that Priority has been updated, need to run on entire collection as the priority is linked to index
-                foreach (var plugin in Mods)
-                { 
+                foreach (var plugin in AllMods)
+                {
                     Dispatcher.UIThread.Post(() => plugin.NotifyPropertyChanged());
                 }
             }
         }
 
+        public int Priority
+        {
+            get { return AllMods.IndexOf(this); }
+            set
+            {
+                if (value < 0 || value >= AllMods.Count) { return; } // Stop out of range exception.
+
+                // Use UI thread to avoid Null Reference Exception when Avalonia get confused by changes to the collection
+                // and to ensure everything gets updated with the changed values.
+                Dispatcher.UIThread.Post(() => AllMods.RemoveAt(Priority));
+                Dispatcher.UIThread.Post(() => AllMods.Insert(value, this));
+                Dispatcher.UIThread.Post(() => FileIO.SaveModOrder(AllMods));
+
+                // Tell Avalonia that Priority has been updated, need to run on entire collection as the priority is linked to index
+                foreach (var plugin in AllMods)
+                {
+                    Dispatcher.UIThread.Post(() => plugin.NotifyPropertyChanged());
+                }
+            }
+        }
+
+        public string SourceDirectory => Path.Combine(FileIO.ModsDirectory, Name);
+
+        public IEnumerable<string> Plugins => FileIO.GetPluginNamesFromDirectory(SourceDirectory);
+
         /// <remarks>
         /// Should always have the same values as the original.
         /// </remarks>
-        private ObservableCollection<ModData> Mods { get; }
+        private ObservableCollection<ModData> AllMods { get; }
+        private ObservableCollection<PluginData> AllPlugins { get; }
 
-        public ModData(string name, bool isActive, ObservableCollection<ModData> mods)
+        public ModData(string name, bool isActive, ObservableCollection<ModData> mods, ObservableCollection<PluginData> plugins)
         {
             Name = name;
             _IsActive = isActive; // Directly set backing field to avoid calling FileIO.Save in the property. This is to stop it running potentially hundreds of times during initial setup as it can be called manually anyway.
-            Mods = mods;
-
+            AllMods = mods;
+            AllPlugins = plugins;
         }
 
         private void NotifyPropertyChanged([CallerMemberName] string propertyName = "") => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

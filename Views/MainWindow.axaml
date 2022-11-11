@@ -15,8 +15,8 @@
     </Design.DataContext>
 
 
-  <StackPanel>
-    <StackPanel Orientation="Horizontal">
+  <DockPanel>
+    <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
       <Button Command="{Binding RunGame}">Play</Button>
       <TextBox Text="{Binding TestPath}"/>
       <Button Command="{Binding InstallMod}">Install Mod</Button>
@@ -39,5 +39,5 @@
         </DataGrid.Columns>
       </DataGrid>
     </Grid>
-  </StackPanel>
+  </DockPanel>
 </Window>
