@@ -1,3 +1,5 @@
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using ModManager.Models;
 using ReactiveUI;
@@ -7,6 +9,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.Versioning;
 
 namespace ModManager.ViewModels
 {
@@ -68,11 +71,31 @@ namespace ModManager.ViewModels
             Process.Start(info);
         }
 
-        public static string? CompressedModPath { get; set; }
-
-        public static async void InstallMod()
+        async void InstallModFileDialogue()
         {
-            string? sourceArchive = CompressedModPath;
+            FileDialogFilter supportedExtensions = new();
+            supportedExtensions.Extensions = new List<string> { "7z", "zip", "rar" };
+
+            OpenFileDialog dialogue = new OpenFileDialog
+            {
+                Title = "Pick Compressed Archive",
+                // AllowMultiple = true, // I don't think I can trust users to not hang their computer with this feature.
+                Filters = new List<FileDialogFilter> { supportedExtensions }
+            };
+
+            Window mainWindow = ((IClassicDesktopStyleApplicationLifetime)App.Current!.ApplicationLifetime!).MainWindow; // Should always exist and implement that interface as we're only supporting Windows, and maybe Linux.
+
+            string[]? files = await dialogue.ShowAsync(mainWindow);
+            if (files == null) { return; }
+                
+            foreach (string file in files) // TODO: Support multiple file selection, but extract one at a time. This'll work best with a progress bar denoting that some are 0.
+            {
+                InstallMod(file);
+            }
+        }
+
+        public static async void InstallMod(string sourceArchive)
+        {
             if (!File.Exists(sourceArchive)) // Shouldn't occur with picking through file dialogue, but just in case.
             {
                 // TODO: Report error.
