@@ -49,13 +49,13 @@ namespace ModManager.ViewModels
                 Directory.Delete(FileIO.GameTargetDirectory, true);
             }
 
-            FileIO.CreateHardLinks(FileIO.GameSourceDirectory, FileIO.GameTargetDirectory); // Hardlink the vanilla game.
 
-            IEnumerable<Mod> activeMods = Mods.Where(plugin => plugin.IsActive).Reverse(); // When creating hard links through the Win32 API if a file exists it won't be overwrote, so reverse the mods to be hard linked and then hard link that way. TODO: What if there's a core file to be overwrote?
+            IEnumerable<Mod> activeMods = Mods.Where(plugin => plugin.IsActive).Reverse(); // When creating hard links through the Win32 API if a file exists it won't be overwrote, so reverse the mods to be hard linked and then do the source game directory last.
             foreach (Mod mod in activeMods) // Hardlink the mods. TODO: Check if root mod.
             {
                 FileIO.CreateHardLinks(mod.SourceDirectory, FileIO.GameDataTargetDirectory);
             }
+            FileIO.CreateHardLinks(FileIO.GameSourceDirectory, FileIO.GameTargetDirectory); // Hardlink the vanilla game.
 
             string path = Path.Combine(FileIO.GameTargetDirectory, "Skyrim.ccc"); // Skyrim.ccc overrides plugins.txt. TODO: Have a collection of files to delete?
             if (File.Exists(path))
