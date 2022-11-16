@@ -24,7 +24,7 @@ namespace ModManager
 
         public bool Match(object data)
         {
-            return data is MainWindowViewModel;
+            return data is ViewModelBase;
         }
     }
 }

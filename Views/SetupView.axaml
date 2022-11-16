@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="ModManager.Views.SetupView">
+
+  <Panel HorizontalAlignment="Center" VerticalAlignment="Center">
+    <StackPanel Orientation="Vertical">
+      <StackPanel Orientation="Horizontal">
+        <TextBlock> GamePath: </TextBlock>
+        <TextBox Text="{Binding GameSourceDirectory}"/>
+        <Button Command="{Binding SetGameSourceDirectory}">...</Button>
+      </StackPanel>
+      <StackPanel Orientation="Horizontal">
+        <TextBlock> PluginPath: </TextBlock>
+        <TextBox Text="{Binding PluginOrderFile}"/>
+        <Button Command="{Binding SetPluginOrderDirectory}">... </Button>
+      </StackPanel>
+      <Button Command="{Binding Accept}">Accept</Button>
+    </StackPanel>
+  </Panel>
+</UserControl>

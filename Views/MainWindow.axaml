@@ -1,58 +1,18 @@
-<!-- TODO: How to make it so checkbox bindings get automatically updated when checked? https://github.com/AvaloniaUI/Avalonia/issues/6512-->
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:ModManager.ViewModels"
-        xmlns:io="using:ModManager"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="ModManager.Views.MainWindow"
         Icon="/Assets/avalonia-logo.ico"
-        Title="ModManager">
+        Title="ModManager"
+        Content="{Binding Content}">
 
   <!-- This is just used by the designer / previewer.
        This uses the solution directory as the current working directory which causes ModManagerDirectory (and possibly other 
        directories) to be in the wrong place. -->
   <!--<Design.DataContext>
-    <vm:MainWindowViewModel/>
-  </Design.DataContext>-->
-
-
-  <DockPanel>
-    <StackPanel Orientation="Horizontal" DockPanel.Dock="Top">
-      <Button  Command="{Binding RunGame}">Play</Button>
-      <Button Command="{Binding InstallModFileDialogue}">Install Mod</Button>
-    </StackPanel>
-    <Grid ColumnDefinitions="*, 4, *">
-      <!-- Mod Order -->
-      <DataGrid Grid.Column="0" Items="{Binding Mods}" AutoGenerateColumns="False">
-        <DataGrid.Columns>
-          <DataGridTemplateColumn CanUserSort="True" SortMemberPath="IsActive">
-            <DataGridTemplateColumn.CellTemplate>
-              <DataTemplate>
-                <CheckBox IsChecked="{Binding IsActive}"/>
-              </DataTemplate>
-            </DataGridTemplateColumn.CellTemplate>
-          </DataGridTemplateColumn>
-          <DataGridTextColumn Header="Name" Binding="{Binding Name}" IsReadOnly="True"/>
-          <DataGridTextColumn Header="Priority" Binding="{Binding Priority, Mode=TwoWay}" />
-        </DataGrid.Columns>
-      </DataGrid>
-      <GridSplitter Grid.Column="1" Background="Black" ResizeDirection="Columns"/>
-      <!-- Plugin Order -->
-      <DataGrid Grid.Column="2" Items="{Binding Plugins}" AutoGenerateColumns="False">
-        <DataGrid.Columns>
-          <DataGridTemplateColumn CanUserSort="True" SortMemberPath="IsActive">
-            <DataGridTemplateColumn.CellTemplate>
-              <DataTemplate>
-                <CheckBox IsChecked="{Binding IsActive}"/>
-              </DataTemplate>
-            </DataGridTemplateColumn.CellTemplate>
-          </DataGridTemplateColumn>
-          <DataGridTextColumn Header="Name" Binding="{Binding Name}" IsReadOnly="True"/>
-          <DataGridTextColumn Header="Priority" Binding="{Binding Priority, Mode=TwoWay}" />
-        </DataGrid.Columns>
-      </DataGrid>
-    </Grid>
-  </DockPanel>
+      <vm:MainWindowViewModel/>
+      </Design.DataContext>-->
 </Window>

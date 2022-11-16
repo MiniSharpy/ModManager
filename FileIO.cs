@@ -6,21 +6,57 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 
 namespace ModManager
 {
     public static class FileIO
     {
-        public static readonly string GameSourceDirectory = "D:/Tools/Skyrim Anniversary Edition"; // TODO: Set based off user customisable profile.
-        public static readonly string GameDataSourceDirectory = Path.Combine(GameSourceDirectory, "Data");
-        public static readonly string PluginOrderFile = "C:/Users/Bradley/AppData/Local/Skyrim Special Edition GOG/plugins.txt"; // TODO: Set to the users path, dependent on game.
+        private static string? _GameSourceDirectory;
+
+        public static string? GameSourceDirectory
+        {
+            get { return _GameSourceDirectory; }
+            set { _GameSourceDirectory = value; GameDataSourceDirectory = Path.Combine(value, "Data"); }
+        }
+
+        public static string? GameDataSourceDirectory { get; private set; }
+        public static string? PluginOrderFile { get; set; }
 
         public static readonly string ModManagerDirectory = Directory.GetCurrentDirectory();
         public static readonly string ModsDirectory = Path.Combine(ModManagerDirectory, "Mods");
+        public static readonly string ModManagerConfigFile = Path.Combine(ModManagerDirectory, "GeneralConfig.json");
 
         public static readonly string GameTargetDirectory = Path.Combine(ModManagerDirectory, "Game");
         public static readonly string GameDataTargetDirectory = Path.Combine(GameTargetDirectory, "Data");
         public static readonly string ModOrderFile = Path.Combine(ModManagerDirectory, "mods.txt");
+
+        static FileIO()
+        {
+            // Read config from JSON
+            if (File.Exists(ModManagerConfigFile))
+            {
+                string json = File.ReadAllText(ModManagerConfigFile);
+                GeneralConfig config = JsonSerializer.Deserialize<GeneralConfig>(json)!; // Doesn't matter if it's null as we check for that on launch.
+                GameSourceDirectory = config.GameSourceDirectory!;
+                PluginOrderFile = config.PluginOrderFile!;
+            }
+
+            //GameSourceDirectory = "D:/Tools/Skyrim Anniversary Edition";
+            //PluginOrderFile = "C:/Users/Bradley/AppData/Local/Skyrim Special Edition GOG/plugins.txt";
+        }
+
+        public static void SaveGeneralConfig()
+        {
+            GeneralConfig config = new()
+            {
+                GameSourceDirectory = GameSourceDirectory,
+                PluginOrderFile = PluginOrderFile
+            };
+
+            string json = JsonSerializer.Serialize(config);
+            File.WriteAllText(ModManagerConfigFile, json);
+        }
 
         /// <summary>
         /// Loads plugins found in <see cref="GameDataTargetDirectory"/> and <see cref="ModsDirectory"/> into a format Avalonia UI can use and then resaves to account for missing/additional plugins.<br/>
