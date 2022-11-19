@@ -219,7 +219,7 @@ namespace ModManager
                 }
                 else if (OperatingSystem.IsLinux())
                 {
-                    return libc.link(fileFullName, newFile) == 0;
+                    return Libc.link(fileFullName, newFile) == 0;
                 }
 
                 return false;
@@ -251,13 +251,13 @@ namespace ModManager
 
         private static class Kernel32
         {
-            [DllImport(nameof(Kernel32), SetLastError = true, CharSet = CharSet.Unicode)]
+            [DllImport("Kernel32", SetLastError = true, CharSet = CharSet.Unicode)]
             public static extern bool CreateHardLink(string fileName, string existingFileName, IntPtr securityAttributes);
         }
 
-        private static class libc
+        private static class Libc
         {
-            [DllImport(nameof(libc), SetLastError = true, CharSet = CharSet.Unicode)]
+            [DllImport("libc", SetLastError = true, CharSet = CharSet.Unicode)]
             public static extern int link(string oldpath, string newpath);
         }
     }

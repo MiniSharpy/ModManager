@@ -121,7 +121,6 @@ namespace ModManager.ViewModels
             }
 
             var process = Process.Start(processName, $"e -spf \"{sourceArchive}\" -o\"{modDirectory}\"");
-            // process.PriorityClass = ProcessPriorityClass.High; // What was this for? Causes exceptions on Linux.
             await process.WaitForExitAsync();
 
             FileIO.LoadModsAndSaveChanges(Mods, Plugins);
