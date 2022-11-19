@@ -52,13 +52,12 @@ namespace ModManager.ViewModels
                 Directory.Delete(FileIO.GameTargetDirectory, true);
             }
 
-
             IEnumerable<Mod> activeMods = Mods.Where(plugin => plugin.IsActive).Reverse(); // When creating hard links through the Win32 API if a file exists it won't be overwrote, so reverse the mods to be hard linked and then do the source game directory last.
             foreach (Mod mod in activeMods) // Hardlink the mods. TODO: Check if root mod.
             {
                 FileIO.CreateHardLinks(mod.SourceDirectory, FileIO.GameDataTargetDirectory);
             }
-            FileIO.CreateHardLinks(FileIO.GameSourceDirectory, FileIO.GameTargetDirectory); // Hardlink the vanilla game.
+            FileIO.CreateHardLinks(FileIO.GameSourceDirectory!, FileIO.GameTargetDirectory); // Hardlink the vanilla game.
 
             string path = Path.Combine(FileIO.GameTargetDirectory, "Skyrim.ccc"); // Skyrim.ccc overrides plugins.txt. TODO: Have a collection of files to delete?
             if (File.Exists(path))
@@ -66,17 +65,21 @@ namespace ModManager.ViewModels
                 File.Delete(path);
             }
 
-            ProcessStartInfo info = new(Path.Combine(FileIO.GameTargetDirectory, "SkyrimSE.exe"));
-            info.WorkingDirectory = FileIO.GameTargetDirectory;
+            ProcessStartInfo info = new(Path.Combine(FileIO.GameTargetDirectory, "SkyrimSE.exe"))
+            {
+                WorkingDirectory = FileIO.GameTargetDirectory // For setting the correct directory when debugging.
+            };
             Process.Start(info);
         }
 
-        async void InstallModFileDialogue()
+        static async void InstallModFileDialogue()
         {
-            FileDialogFilter supportedExtensions = new();
-            supportedExtensions.Extensions = new List<string> { "7z", "zip", "rar" };
+            FileDialogFilter supportedExtensions = new()
+            {
+                Extensions = new List<string> { "7z", "zip", "rar" }
+            };
 
-            OpenFileDialog dialogue = new OpenFileDialog
+            OpenFileDialog dialogue = new()
             {
                 Title = "Pick Compressed Archive",
                 // AllowMultiple = true, // I don't think I can trust users to not hang their computer with this feature.
@@ -110,7 +113,7 @@ namespace ModManager.ViewModels
             if (OperatingSystem.IsWindows())
                 processName = "7z.exe";
             else if (OperatingSystem.IsLinux())
-                processName = "7zzs";
+                processName = "7zzs"; // This'll need to marked as an executable in Linux or else there'll be an exception.
             else
             {
                 Console.WriteLine("Invalid OS");
@@ -118,7 +121,7 @@ namespace ModManager.ViewModels
             }
 
             var process = Process.Start(processName, $"e -spf \"{sourceArchive}\" -o\"{modDirectory}\"");
-            process.PriorityClass = ProcessPriorityClass.High;
+            // process.PriorityClass = ProcessPriorityClass.High; // What was this for? Causes exceptions on Linux.
             await process.WaitForExitAsync();
 
             FileIO.LoadModsAndSaveChanges(Mods, Plugins);

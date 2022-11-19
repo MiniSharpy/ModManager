@@ -17,13 +17,24 @@ namespace ModManager
         public static string? GameSourceDirectory
         {
             get { return _GameSourceDirectory; }
-            set { _GameSourceDirectory = value; GameDataSourceDirectory = Path.Combine(value, "Data"); }
+            set
+            {
+                _GameSourceDirectory = value;
+                if (value != null)
+                {
+                    GameDataSourceDirectory = Path.Combine(value, "Data");
+                }
+                else
+                {
+                    GameDataSourceDirectory = null;
+                }
+            }
         }
 
         public static string? GameDataSourceDirectory { get; private set; }
         public static string? PluginOrderFile { get; set; }
 
-        public static readonly string ModManagerDirectory = Directory.GetCurrentDirectory();
+        public static readonly string ModManagerDirectory = Directory.GetCurrentDirectory(); // In VSCode this won't be the build folder for some reason.
         public static readonly string ModsDirectory = Path.Combine(ModManagerDirectory, "Mods");
         public static readonly string ModManagerConfigFile = Path.Combine(ModManagerDirectory, "GeneralConfig.json");
 
@@ -38,12 +49,10 @@ namespace ModManager
             {
                 string json = File.ReadAllText(ModManagerConfigFile);
                 GeneralConfig config = JsonSerializer.Deserialize<GeneralConfig>(json)!; // Doesn't matter if it's null as we check for that on launch.
+                // TODO: Handle loading improperly. See https://github.com/Sonozuki/NovaEngine/blob/450c09a5fd221f8cdb99caaf71c929324dda9913/NovaEngine/Settings/SettingsBase.cs#L36
                 GameSourceDirectory = config.GameSourceDirectory!;
                 PluginOrderFile = config.PluginOrderFile!;
             }
-
-            //GameSourceDirectory = "D:/Tools/Skyrim Anniversary Edition";
-            //PluginOrderFile = "C:/Users/Bradley/AppData/Local/Skyrim Special Edition GOG/plugins.txt";
         }
 
         public static void SaveGeneralConfig()
@@ -79,13 +88,13 @@ namespace ModManager
             }
 
             // Get plugins from directory, priority doesn't matter as this is to check if a plugin still exists or if a new plugin has been added externally.
-            IEnumerable<string> existingPlugins = GetPluginNamesFromDirectory(GameDataSourceDirectory); // 2. Load plugins in GameDataSource. These plugins exist, but have not been created by the manager.
+            IEnumerable<string> existingPlugins = GetPluginNamesFromDirectory(GameDataSourceDirectory!); // 2. Load plugins in GameDataSource. These plugins exist, but have not been created by the manager.
             IEnumerable<string> pluginsForActiveMods = mods.Where(mod => mod.IsActive).SelectMany(mod => mod.ManagedPlugins); // 3. Load active plugins in ModsDirectory. All the plugins in ModsDirectory exist, but non-active mods won't have their plugins placed in the hard linked folder.
             existingPlugins = existingPlugins.Concat(pluginsForActiveMods);
 
             IEnumerable<string> potentialPlugins = pluginOrder.Concat(existingPlugins); // Plugin order must come first to get the correct priority.
             List<Plugin> nonDistinctPlugins = new();
-            foreach (string plugin in potentialPlugins) 
+            foreach (string plugin in potentialPlugins)
             {
                 var isActive = plugin[0] == '*';
                 var name = isActive ? plugin.Substring(1) : plugin;
@@ -134,7 +143,7 @@ namespace ModManager
                 var name = isActive ? mod.Substring(1) : mod;
 
                 if (!existingMods.Contains(name)) // 3. Remove non-existent mods from mods.txt. Existing mods will never contain an asterisk as they are retrieved from a directory, so we can use that to check if a mod still exists.
-                { 
+                {
                     continue;
                 }
 
@@ -163,10 +172,10 @@ namespace ModManager
 
             if (!File.Exists(PluginOrderFile))
             {
-                File.Create(PluginOrderFile).Close();
+                File.Create(PluginOrderFile!).Close();
             }
 
-            File.WriteAllLines(PluginOrderFile, formattedPlugins);
+            File.WriteAllLines(PluginOrderFile!, formattedPlugins);
         }
 
         /// <summary>
@@ -202,6 +211,20 @@ namespace ModManager
 
         public static void CreateHardLinks(string source, string target) // Thank you, https://github.com/Sonozuki.
         {
+            static bool CreateHardLink(string newFile, string fileFullName)
+            {
+                if (OperatingSystem.IsWindows())
+                {
+                    return Kernel32.CreateHardLink(newFile, fileFullName, IntPtr.Zero);
+                }
+                else if (OperatingSystem.IsLinux())
+                {
+                    return libc.link(fileFullName, newFile) == 0;
+                }
+
+                return false;
+            }
+
             var directoriesToLink = new Queue<string>();
             directoriesToLink.Enqueue(source);
 
@@ -217,8 +240,8 @@ namespace ModManager
 
                     Directory.CreateDirectory(newDirectory); // Kernel32.CreateHardLink won't automatically create the directory
 
-                    if (!Kernel32.CreateHardLink(newFile, file.FullName, IntPtr.Zero))
-                        Console.WriteLine($"Error occured when creating hardlink for file: {newFile}. Error code: {Marshal.GetLastWin32Error()}");
+                    if (!CreateHardLink(newFile, file.FullName))
+                        Console.WriteLine($"Error occured when creating hardlink for file: {newFile}. Error code: {Marshal.GetLastPInvokeError()}");
                 }
 
                 foreach (var dir in directoryInfo.EnumerateDirectories())
@@ -228,8 +251,14 @@ namespace ModManager
 
         private static class Kernel32
         {
-            [DllImport("Kernel32", SetLastError = true, CharSet = CharSet.Unicode)]
+            [DllImport(nameof(Kernel32), SetLastError = true, CharSet = CharSet.Unicode)]
             public static extern bool CreateHardLink(string fileName, string existingFileName, IntPtr securityAttributes);
+        }
+
+        private static class libc
+        {
+            [DllImport(nameof(libc), SetLastError = true, CharSet = CharSet.Unicode)]
+            public static extern int link(string oldpath, string newpath);
         }
     }
 }
