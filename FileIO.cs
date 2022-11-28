@@ -20,14 +20,8 @@ namespace ModManager
             set
             {
                 _GameSourceDirectory = value;
-                if (value != null)
-                {
-                    GameDataSourceDirectory = Path.Combine(value, "Data");
-                }
-                else
-                {
-                    GameDataSourceDirectory = null;
-                }
+
+                GameDataSourceDirectory = value != null ? Path.Combine(value, "Data") : null;
             }
         }
 
@@ -211,15 +205,15 @@ namespace ModManager
 
         public static void CreateHardLinks(string source, string target) // Thank you, https://github.com/Sonozuki.
         {
-            static bool CreateHardLink(string newFile, string fileFullName)
+            static bool CreateHardLink(string newPath, string oldPath)
             {
                 if (OperatingSystem.IsWindows())
                 {
-                    return Kernel32.CreateHardLink(newFile, fileFullName, IntPtr.Zero);
+                    return Kernel32.CreateHardLink(newPath, oldPath, IntPtr.Zero);
                 }
                 else if (OperatingSystem.IsLinux())
                 {
-                    return Libc.link(fileFullName, newFile) == 0;
+                    return Libc.link(oldPath, newPath) == 0;
                 }
 
                 return false;
@@ -248,17 +242,6 @@ namespace ModManager
                     directoriesToLink.Enqueue(dir.FullName);
             }
         }
-
-        private static class Kernel32
-        {
-            [DllImport("Kernel32", SetLastError = true, CharSet = CharSet.Unicode)]
-            public static extern bool CreateHardLink(string fileName, string existingFileName, IntPtr securityAttributes);
-        }
-
-        private static class Libc
-        {
-            [DllImport("libc", SetLastError = true, CharSet = CharSet.Unicode)]
-            public static extern int link(string oldpath, string newpath);
-        }
     }
 }
+

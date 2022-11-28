@@ -28,10 +28,10 @@
     <PackageReference Include="XamlNameReferenceGenerator" Version="1.3.4" />
   </ItemGroup>
   <ItemGroup>
-    <None Update="7z.exe" Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+    <None Update="7z.exe" Condition="'$(RuntimeIdentifier)' == 'win-x64' or ('$(RuntimeIdentifier)' != 'linux-x64' and '$(OS)' == 'Windows_NT')"> <!--Building via VS doesn't seem to be trigger the former, so latter is hacky way to build on VS.-->
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="7zzs" Condition="'$(RuntimeIdentifier)' == 'linux-x64'">
+    <None Update="7zzs" Condition="'$(RuntimeIdentifier)' == 'linux-x64' or ('$(RuntimeIdentifier)' != 'win-x64' and '$(OS)' == 'UNIX')">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
