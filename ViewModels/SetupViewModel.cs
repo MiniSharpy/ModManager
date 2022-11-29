@@ -39,7 +39,7 @@ namespace ModManager.ViewModels
 
         async void SetGameSourceDirectory()
         {
-            OpenFolderDialog dialogue = new OpenFolderDialog
+            OpenFolderDialog dialogue = new()
             {
                 Title = "Pick Game Directory",
             };
@@ -54,9 +54,15 @@ namespace ModManager.ViewModels
 
         async void SetPluginOrderDirectory() // This is a bit of an awkward one. It's only really Linux and GOG that'll need to set this. There must be a better way. Could have a drop down selection for game that determines where to check, and only on Linux allow setting.
         {
-            string? defaultPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData); // TODO: Set a default for Linux.
+            string? defaultPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            // Options for Steam, GOG. GOG Proton, Manual.
+            if (OperatingSystem.IsLinux()) // WINE is too dependent on the user, proton can depend on whether we're trying to run the game through Steam or not.
+            {
+                defaultPath = Path.Combine(defaultPath, "Steam/steamapps/compatdata/489830/pfx/drive_c/users/steamuser/AppData/Local/Skyrim Special Edition/"); // This may not always exist, but it will on steamdeck.
+                Console.WriteLine("Default Plugin Path:", defaultPath);
+            }
 
-            OpenFolderDialog dialogue = new OpenFolderDialog
+            OpenFolderDialog dialogue = new()
             {
                 Title = "Pick Game Directory",
                 Directory = defaultPath

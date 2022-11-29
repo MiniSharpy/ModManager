@@ -65,11 +65,29 @@ namespace ModManager.ViewModels
                 File.Delete(path);
             }
 
-            ProcessStartInfo info = new(Path.Combine(FileIO.GameTargetDirectory, "SkyrimSE.exe"))
+            if (OperatingSystem.IsWindows())
             {
-                WorkingDirectory = FileIO.GameTargetDirectory // For setting the correct directory when debugging.
-            };
-            Process.Start(info);
+                ProcessStartInfo info = new(Path.Combine(FileIO.GameTargetDirectory, "SkyrimSE.exe"))
+                {
+                    WorkingDirectory = FileIO.GameTargetDirectory // For setting the correct directory when debugging.
+                };
+                Process.Start(info);
+            }
+            else if (OperatingSystem.IsLinux())
+            {
+                string compatDirectory = Directory.CreateDirectory(Path.Combine(Directory.GetCurrentDirectory(), "CompatData")).FullName;
+                string localFolder = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
+                Environment.SetEnvironmentVariable("STEAM_COMPAT_CLIENT_INSTALL_PATH", $"{localFolder}/Steam/");
+                Environment.SetEnvironmentVariable("STEAM_COMPAT_DATA_PATH", $"{compatDirectory}");
+
+                ProcessStartInfo info = new($"{localFolder}/Steam/steamapps/common/Proton 7.0/proton") // Will want to look for an existing version of Proton.
+                {
+                    WorkingDirectory = FileIO.GameTargetDirectory,
+                    Arguments = $"run SkyrimSE.exe",
+                };
+                Process.Start(info);
+            }
         }
 
         static async void InstallModFileDialogue()
@@ -111,9 +129,14 @@ namespace ModManager.ViewModels
 
             string processName; // Thank you, https://github.com/Sonozuki.
             if (OperatingSystem.IsWindows())
+            { 
                 processName = "7z.exe";
+            }
             else if (OperatingSystem.IsLinux())
+            { 
                 processName = "7zzs"; // This'll need to marked as an executable in Linux or else there'll be an exception.
+                Libc.chmod(processName, 755);  // Should I take into account existing permissions?
+            }
             else
             {
                 Console.WriteLine("Invalid OS");
